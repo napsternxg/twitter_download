@@ -25,10 +25,12 @@ cache = {}
 if args.partial != None:
     for line in args.partial:
         fields = line.strip().split("\t")
-        data = fields[5:]
+        data = fields[-6:]
         sid = fields[0]
         cache[sid] = data
 
+counter = 0
+not_found = 0
 for line in args.dist:
     fields = line.strip().split('\t')
     sid = fields[0]
@@ -42,6 +44,10 @@ for line in args.dist:
             #print >> sys.stderr, status
             cache[sid] = [text,status['retweet_count'], user['screen_name'],\
                     user['followers_count'], user['friends_count'], user['statuses_count']]
+            counter += 1
+            if counter >= 1000 and (counter % 1000 == 0):
+                sys.stderr.write("Finished downloading %s tweets, not found %s\n" % (counter, not_found))
+
         except TwitterError as e:
             if e.e.code == 429:
                 rate = t.application.rate_limit_status()
@@ -50,12 +56,14 @@ for line in args.dist:
                 future = datetime.datetime.fromtimestamp(reset)
                 seconds = (future-now).seconds+1
                 if seconds < 10000:
-                    sys.stderr.write("Rate limit exceeded, sleeping for %s seconds until %s\n" % (seconds, future))
+                    sys.stderr.write("Rate limit exceeded, sleeping for %s seconds until %s, current downloaded are: %s, not found are %s\n"\
+                            % (seconds, future, counter, not_found))
                     time.sleep(seconds)
             else:
-                #cache[sid] = ['Not Available',-1,'-',-1,-1,-1]
-                cache[sid] = None
+                not_found += 1
+                cache[sid] = ['Not Available',-1,'-',-1,-1,-1]
             
     #text = cache[sid]
-    if cache[sid] is not None:
-        print "\t".join(fields + [cache[sid][0]] + [str(k) for k in cache[sid][1:]])
+    print "\t".join(fields + [cache[sid][0]] + [str(k) for k in cache[sid][1:]])
+
+sys.stderr.write("Done, Finished downloading %s tweets, not found %s\n" % (counter, not_found))
